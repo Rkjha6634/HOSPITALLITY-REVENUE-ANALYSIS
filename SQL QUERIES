@@ -1,0 +1,355 @@
+1- What is the overall occupancy rate for each hotel in a specific date range, 
+and can you identify which hotels have consistently high or low occupancy rates?
+
+SELECT
+    dh.property_name AS hotel_name,
+    SUM(fb.successful_bookings) AS total_bookings,
+    dh.category AS hotel_category,
+    SUM(fb.capacity) AS total_capacity,
+    ROUND((SUM(fb.successful_bookings) / SUM(fb.capacity)) * 100, 2) AS occupancy_rate
+FROM facts_agg_bookings fb
+JOIN dim_hotels dh ON fb.property_id = dh.property_id  
+GROUP BY dh.property_name, dh.category
+ORDER BY occupancy_rate DESC
+limit 10;
+
+2- Which room category had the highest revenue generated across all properties, 
+and can you list the top three properties that contributed the most to this revenue?
+
+select fb.property_id , dm.room_id , sum(revenue_generated) as total_revenue_generated
+from facts_bookings fb 
+join dim_rooms dm 
+on fb.room_category = dm.room_id
+group by fb.property_id , dm.room_id 
+order by total_revenue_generated desc 
+limit 5 
+
+3- For each hotel, calculate the average ratings given by guests. Can you identify hotels 
+with high ratings that might be good candidates for marketing and promotion?
+
+select dh.property_name , avg(fb.ratings_given) as average_rating 
+from facts_bookings fb 
+join dim_hotels dh 
+on fb.property_id  = dh.property_id
+group by dh.property_name 
+order by average_rating desc
+
+4-  Are there any patterns in booking behavior based on the day of the week (e.g., weekdays vs. weekends) or 
+specific months that could help in optimizing pricing and marketing strategies? 
+
+select 
+EXTRACT(DAY FROM dd.date) AS day_of_week,
+    EXTRACT(MONTH FROM dd.date) AS checkin_month,
+    COUNT(*) AS total_bookings
+from facts_bookings fb 
+join dim_date dd 
+on fb.check_in_date = dd.date 
+GROUP BY day_of_week, checkin_month
+ORDER BY day_of_week, checkin_month;
+
+
+5- What is the overall revenue realized percentage across all properties, 
+and can you identify properties with consistently low revenue realization?
+
+select 
+	dh.property_name AS hotel_name,
+    SUM(fb.revenue_realized) AS total_revenue_realized,
+    SUM(fb.revenue_generated) AS total_revenue_generated,
+    ROUND((SUM(fb.revenue_realized) / SUM(fb.revenue_generated)) * 100, 2) AS revenue_realized_percentage
+from facts_bookings fb 
+join dim_hotels dh 
+on fb.property_id = dh.property_id
+group by dh.property_name
+
+6-  What is the average daily revenue generated for each hotel during a specific date range?
+
+select 
+	dh.property_name AS hotel_name,
+   avg(revenue_generated) as avg_total_revenue_generated ,
+   avg(revenue_realized) as avg_total_revenue_realized
+from facts_bookings fb 
+join dim_hotels dh 
+on fb.property_id = dh.property_id
+group by dh.property_name
+
+7- How does the occupancy rate vary by hotel category and  room categories ?
+
+select 
+    dh.category as Hotel_category ,
+    dr.room_class as room_category,
+    SUM(fab.successful_bookings) AS total_bookings,
+    SUM(fab.capacity) AS total_capacity,
+    ROUND((SUM(fab.successful_bookings) / SUM(fab.capacity)) * 100, 2) AS occupancy_rate
+from facts_agg_bookings fab 
+join dim_hotels dh 
+on fab.property_id = dh.property_id 
+join dim_rooms dr
+on fab.room_category = dr.room_id 
+group by dh.category ,dr.room_class 
+
+
+8- Which room category has the highest percentage of successful bookings, and is this consistent across hotels? 
+
+WITH SuccessfulBookings AS (
+    SELECT
+        fb.room_category,
+        ROUND(SUM(fb.successful_bookings) * 100.0 / SUM(fb.capacity), 2) AS success_percentage
+    FROM
+        facts_agg_bookings fb
+    GROUP BY
+        fb.room_category
+)
+SELECT
+    sb.room_category,
+    sb.success_percentage AS highest_success_percentage,
+    CASE
+        WHEN sb.success_percentage = (SELECT MAX(success_percentage) FROM SuccessfulBookings) THEN 'Yes'
+        ELSE 'No'
+    END AS consistent_across_hotels
+FROM
+    SuccessfulBookings sb;
+
+
+9- What is the overall capacity utilization across all properties, and does it vary based on room categories? 
+
+WITH CapacityUtilization AS (
+    SELECT
+        'All Properties' AS property,
+        SUM(fb.successful_bookings) AS total_successful_bookings,
+        SUM(fb.capacity) AS total_capacity
+    FROM
+        facts_agg_bookings fb
+    UNION ALL
+    SELECT
+        fb.room_category AS property,
+        SUM(fb.successful_bookings) AS total_successful_bookings,
+        SUM(fb.capacity) AS total_capacity
+    FROM
+        facts_agg_bookings fb
+    GROUP BY
+        fb.room_category
+)
+SELECT
+    property,
+    ROUND((SUM(total_successful_bookings) * 100.0 / SUM(total_capacity), 2)) AS capacity_utilization
+FROM
+    CapacityUtilization
+GROUP BY
+    property;
+
+10- Are there any patterns in the day of the week with the highest revenue generated for each hotel?
+
+WITH CapacityUtilization AS (
+    SELECt 'All Properties' AS property,SUM(fb.successful_bookings) AS total_successful_bookings,
+	SUM(fb.capacity) AS total_capacity
+    FROM facts_agg_bookings fb
+    UNION ALL
+    SELECT
+        fb.room_category AS property,
+        SUM(fb.successful_bookings) AS total_successful_bookings,
+        SUM(fb.capacity) AS total_capacity
+    FROM facts_agg_bookings fb
+    GROUP BY fb.room_category
+)
+SELECT
+    property,
+    ROUND((SUM(total_successful_bookings) * 100.0 / SUM(total_capacity), 2)) AS capacity_utilization
+FROM CapacityUtilization
+GROUP BY property;
+WITH RevenueByDay AS (
+    SELECT
+        property_id,
+        DAYNAME(booking_date) AS day_of_week,
+        SUM(revenue_generated) AS total_revenue
+    FROM facts_bookings
+    GROUP BY property_id, DAYNAME(booking_date)
+),
+RankedRevenue AS (
+    SELECT
+        r.property_id,
+        r.day_of_week,
+        r.total_revenue,
+        ROW_NUMBER() OVER (PARTITION BY r.property_id ORDER BY r.total_revenue DESC) AS rankk
+    FROM RevenueByDay r
+)
+SELECT
+    r.property_id,
+    r.day_of_week AS highest_revenue_day,
+    r.total_revenue AS highest_revenue
+FROM RankedRevenue r
+WHERE r.rankk = 1;
+
+11- Which hotel property has the highest number of canceled bookings, and what are the common characteristics of these bookings? 
+
+WITH CanceledBookings AS (
+    SELECT
+        property_id,
+        booking_id,
+        room_category,
+        no_guests,
+        booking_date,
+        checkout_date,
+        ratings_given
+    FROM facts_bookings
+    WHERE booking_status = 'Cancelled'
+),
+PropertyCanceledBookingCounts AS (
+    SELECT
+        cb.property_id,
+        COUNT(cb.booking_id) AS canceled_booking_count
+    FROM CanceledBookings cb
+    GROUP BY cb.property_id
+),
+MaxCanceledBookings AS (
+    SELECT
+        pc.property_id,
+        pc.canceled_booking_count
+    FROM PropertyCanceledBookingCounts pc
+    WHERE pc.canceled_booking_count = (SELECT MAX(canceled_booking_count) FROM PropertyCanceledBookingCounts)
+)
+SELECT
+    mcb.property_id,
+    mcb.canceled_booking_count,
+    cb.room_category,
+    cb.no_guests,
+    cb.booking_date,
+    cb.checkout_date
+    
+FROM MaxCanceledBookings mcb
+JOIN CanceledBookings cb
+ON mcb.property_id = cb.property_id;
+
+
+12- How does the revenue realized percentage vary across different booking platforms? 
+
+WITH RevenueRealizedByPlatform AS (
+    SELECT booking_platform, SUM(revenue_realized) AS total_revenue_realized, SUM(revenue_generated) AS total_revenue_generated
+    FROM facts_bookings
+    WHERE revenue_generated > 0
+    GROUP BY booking_platform
+)
+SELECT booking_platform, ROUND(SUM(total_revenue_realized) * 100.0 / SUM(total_revenue_generated), 2) AS revenue_realized_percentage
+FROM RevenueRealizedByPlatform
+GROUP BY booking_platform
+ORDER BY revenue_realized_percentage DESC;
+
+13- Can you identify properties with consistently high revenue realization, and are there common attributes among them?
+
+WITH PropertyRevenueRealization AS (
+    SELECT property_id, AVG(revenue_realized) AS avg_revenue_realized
+    FROM facts_bookings
+    GROUP BY property_id
+    HAVING AVG(revenue_realized) > 0
+)
+SELECT p.property_name, p.category, p.city,
+    pr.avg_revenue_realized AS average_revenue_realized
+FROM PropertyRevenueRealization pr
+JOIN dim_hotels p
+ON pr.property_id = p.property_id;
+
+14- What is the total number of unique properties in each city?
+
+SELECT city, COUNT(DISTINCT property_id) AS unique_properties_count
+FROM dim_hotels
+GROUP BY city;
+
+15- Which room category has the highest average number of guests?
+
+SELECT room_category, AVG(no_guests) AS average_guests
+FROM facts_bookings
+GROUP BY room_category
+ORDER BY average_guests DESC
+
+16- How do different hotel categories compare in terms of the average length of guest stays?
+
+SELECT d.category AS hotel_category, round(AVG(DATEDIFF(checkout_date, check_in_date))) AS average_stay_length
+FROM dim_hotels d
+JOIN facts_bookings f
+ON d.property_id = f.property_id
+GROUP BY d.category
+ORDER BY average_stay_length;
+
+17- What is the total revenue generated for each hotel property, and how does it relate to the number of successful bookings?
+
+WITH PropertyRevenue AS (
+    SELECT fb.property_id, dh.property_name, SUM(revenue_generated) AS total_revenue
+    FROM facts_bookings fb
+    JOIN dim_hotels dh
+    ON fb.property_id = dh.property_id
+    GROUP BY fb.property_id, dh.property_name
+),
+PropertySuccessfulBookings AS (
+    SELECT property_id, COUNT(booking_id) AS total_successful_bookings
+    FROM facts_bookings
+    WHERE booking_status = 'Checked Out'
+    GROUP BY property_id
+)
+SELECT
+    pr.property_id,
+    pr.property_name,
+    pr.total_revenue,
+    ps.total_successful_bookings,
+    pr.total_revenue / ps.total_successful_bookings AS revenue_per_successful_booking
+FROm propertyRevenue pr
+JOIn PropertySuccessfulBookings ps
+On pr.property_id = ps.property_id;
+
+18- Can you identify properties with a high number of "No Show" bookings?
+
+SELECT dh.property_id, dh.property_name, COUNT(booking_id) AS no_show_bookings_count
+FROM facts_bookings fb
+JOIN dim_hotels dh
+On fb.property_id = dh.property_id
+WHERE booking_status = 'No Show'
+GROUP BY dh.property_id, dh.property_name
+ORDER BY no_show_bookings_count DESC;
+
+19- How does the hotel category impact the average revenue per guest across all properties? 
+
+SELECT dh.category AS hotel_category, AVG(fb.revenue_generated / fb.no_guests) AS average_revenue_per_guest
+FROM facts_bookings fb
+JOIN dim_hotels dh
+ON fb.property_id = dh.property_id
+WHERE fb.no_guests > 0
+GROUP BY dh.category
+ORDER BY average_revenue_per_guest DESC;
+
+20- What is the average lead time between booking and check-in, and how does it differ among hotels?
+
+SELECT dh.property_id, dh.property_name, AVG(DATEDIFF(check_in_date, booking_date)) AS average_lead_time
+FROM facts_bookings fb
+JOIN dim_hotels dh
+ON fb.property_id = dh.property_id
+GROUP BY dh.property_id, dh.property_name
+ORDER BY average_lead_time;
+
+
+21- identify properties with a high number of direct online bookings, and what strategies can be developed to attract more direct bookings? 
+
+SELECT dh.property_id, dh.property_name, COUNT(booking_id) AS direct_online_bookings_count
+FROM facts_bookings fb
+JOIN dim_hotels dh
+ON fb.property_id = dh.property_id
+WHERE booking_platform = 'direct online'
+GROUP BY dh.property_id, dh.property_name
+ORDER BY direct_online_bookings_count DESC;
+
+22- What is the distribution of booking statuses  across different room categories?
+
+SELECT fb.room_category, booking_status, COUNT(booking_id) AS booking_count
+FROM facts_bookings fb
+GROUP BY fb.room_category, booking_status
+ORDER BY fb.room_category, booking_count DESC;
+
+23-  Can you identify properties with consistently low capacity utilization, and what actions can be taken to improve it? 
+
+WITH CapacityUtilization AS (
+    SELECT dh.property_id, dh.property_name, ROUND((SUM(fb.successful_bookings) * 100.0 / SUM(fb.capacity), 2)) AS average_capacity_utilization
+    FROM facts_agg_bookings fb
+    JOIN dim_hotels dh
+    ON fb.property_id = dh.property_id
+    GROUP BY dh.property_id, dh.property_name
+)
+SELECT property_id, property_name, average_capacity_utilization
+FROM CapacityUtilization
+WHERE average_capacity_utilization < 50;
