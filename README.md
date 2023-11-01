@@ -1,1 +1,2 @@
-# HOSPITALLITY-REVENUE-ANALYSIS
+# HOSPITALLITY-REVENUE-ANALYSIS 
+The Hotel Data Analysis and Property Optimization Project is a comprehensive data analysis initiative aimed at optimizing the performance and profitability of a chain of hotels. This project involves in-depth data analysis of various aspects of the hotel business, ranging from occupancy rates and revenue generation to booking behaviors and guest satisfaction. The primary goal of this project is to identify trends, patterns, and opportunities that will help the hotel management make informed decisions and implement effective strategies to improve overall performance and guest satisfaction
