@@ -1,4 +1,5 @@
-```sql
+<pre>
+```
 1- What is the overall occupancy rate for each hotel can you identify which hotels have consistently high or low occupancy rates?
 
 SELECT
@@ -318,4 +319,5 @@ WITH CapacityUtilization AS (
 SELECT property_id, property_name, average_capacity_utilization
 FROM CapacityUtilization
 WHERE average_capacity_utilization < 50;
-```sql
+```
+</pre>
