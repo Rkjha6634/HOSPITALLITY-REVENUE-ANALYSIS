@@ -1,3 +1,4 @@
+```sql
 1- What is the overall occupancy rate for each hotel can you identify which hotels have consistently high or low occupancy rates?
 
 SELECT
@@ -185,7 +186,18 @@ JOIN CanceledBookings cb
 ON mcb.property_id = cb.property_id;
 
 
-12- 
+12- Calculate MONTH ON MONTH Revenue 
+WITH MonthlyRevenue AS (
+    SELECT DATE_FORMAT(hfb.booking_date, '%Y-%m') AS Month, SUM(hfb.revenue_realized) AS TotalRevenue
+    FROM hospitallity_domain.facts_bookings hfb
+    JOIN hospitallity_domain.dim_date hdd ON hfb.booking_date = hdd.date
+    GROUP BY DATE_FORMAT(hfb.booking_date, '%Y-%m')
+)
+SELECT current.Month, current.TotalRevenue AS CurrentMonthRevenue, 
+	LAG(current.TotalRevenue) OVER (ORDER BY current.Month) AS PreviousMonthRevenue,
+    (current.TotalRevenue - LAG(current.TotalRevenue) OVER (ORDER BY current.Month)) / LAG(current.TotalRevenue) OVER (ORDER BY current.Month) AS RevenueGrowthRate
+FROM MonthlyRevenue current
+ORDER BY current.Month;
 
 13- Can you identify properties with consistently high revenue realization, and are there common attributes among them?
 
@@ -214,7 +226,21 @@ FROM facts_bookings
 GROUP BY room_category
 ORDER BY average_guests DESC
 
-16- 
+16- Calculate WEEK ON WEEK REVENUE 
+WITH WeeklyRevenue AS (
+    SELECT DATE_FORMAT(hfb.booking_date, '%X-%V') AS Week, SUM(hfb.revenue_realized) AS TotalRevenue
+    FROM hospitallity_domain.facts_bookings hfb
+    JOIN hospitallity_domain.dim_date hdd ON hfb.booking_date = hdd.date
+    GROUP BY DATE_FORMAT(hfb.booking_date, '%X-%V')
+)
+SELECT
+    current.Week,
+    current.TotalRevenue AS CurrentWeekRevenue,
+    LAG(current.TotalRevenue) OVER (ORDER BY current.Week) AS PreviousWeekRevenue,
+    (current.TotalRevenue - LAG(current.TotalRevenue) OVER (ORDER BY current.Week)) / LAG(current.TotalRevenue) OVER (ORDER BY current.Week) AS RevenueGrowthRate
+FROM WeeklyRevenue current
+ORDER BY current.Week;
+
 17- What is the total revenue generated for each hotel property, and how does it relate to the number of successful bookings?
 
 WITH PropertyRevenue AS (
@@ -260,10 +286,10 @@ WHERE fb.no_guests > 0
 GROUP BY dh.category
 ORDER BY average_revenue_per_guest DESC;
 
-20- What is the average lead time between booking and check-in, and how does it differ among hotels
 
 
-21- identify properties with a high number of direct online bookings ? 
+
+20- identify properties with a high number of direct online bookings ? 
 
 SELECT dh.property_id, dh.property_name, COUNT(booking_id) AS direct_online_bookings_count
 FROM facts_bookings fb
@@ -273,7 +299,7 @@ WHERE booking_platform = 'direct online'
 GROUP BY dh.property_id, dh.property_name
 ORDER BY direct_online_bookings_count DESC;
 
-22- What is the distribution of booking statuses  across different room categories?
+21- What is the distribution of booking statuses  across different room categories?
 
 SELECT fb.room_category, booking_status, COUNT(booking_id) AS booking_count
 FROM facts_bookings fb
@@ -292,3 +318,4 @@ WITH CapacityUtilization AS (
 SELECT property_id, property_name, average_capacity_utilization
 FROM CapacityUtilization
 WHERE average_capacity_utilization < 50;
+```sql
