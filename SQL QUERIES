@@ -309,15 +309,17 @@ ORDER BY fb.room_category, booking_count DESC;
 
 23-  Can you identify properties with consistently low capacity utilization, and what actions can be taken to improve it? 
 
+```
 WITH CapacityUtilization AS (
-    SELECT dh.property_id, dh.property_name, ROUND((SUM(fb.successful_bookings) * 100.0 / SUM(fb.capacity), 2)) AS average_capacity_utilization
+    SELECT
+        dh.property_id,
+        dh.property_name,
+        ROUND((SUM(fb.successful_bookings) * 100.0 / SUM(fb.capacity)), 2) AS average_capacity_utilization
     FROM facts_agg_bookings fb
-    JOIN dim_hotels dh
-    ON fb.property_id = dh.property_id
+    JOIN dim_hotels dh ON fb.property_id = dh.property_id
     GROUP BY dh.property_id, dh.property_name
 )
 SELECT property_id, property_name, average_capacity_utilization
 FROM CapacityUtilization
 WHERE average_capacity_utilization < 50;
 ```
-</pre>
